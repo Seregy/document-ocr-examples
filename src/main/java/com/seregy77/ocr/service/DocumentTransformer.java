@@ -17,6 +17,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,8 +25,6 @@ import java.util.Optional;
 public class DocumentTransformer {
 
     private static final PDType1Font PDF_FONT = PDType1Font.HELVETICA;
-    private static final int INITIAL_FONT_SIZE = 12;
-    private static final float FONT_SIZE_CHANGE_STEP = 0.25f;
     private static final Logger LOGGER = LoggerFactory.getLogger(DocumentTransformer.class);
 
     public Optional<Resource> getSearchableDocument(Resource originalDocument, List<Page> pagesWithText) {
@@ -83,25 +82,12 @@ public class DocumentTransformer {
     }
 
     private float estimateFontSize(Word word, BigDecimal documentWidth) throws IOException {
-        float wordBoundingBoxWidth = word.boundingBox().getWidth(documentWidth).floatValue();
-        String text = word.text();
+        BigDecimal wordBoundingBoxWidth = word.boundingBox().getWidth(documentWidth);
+        BigDecimal stringWidth = BigDecimal.valueOf(PDF_FONT.getStringWidth(word.text()));
 
-        float fontSize = INITIAL_FONT_SIZE;
-        float textWidthWithCurrentSize = calculateTextWidth(text, fontSize);
-
-        if (textWidthWithCurrentSize > wordBoundingBoxWidth) {
-            while (textWidthWithCurrentSize > wordBoundingBoxWidth) {
-                fontSize -= FONT_SIZE_CHANGE_STEP;
-                textWidthWithCurrentSize = calculateTextWidth(text, fontSize);
-            }
-        } else if (textWidthWithCurrentSize < wordBoundingBoxWidth) {
-            while (textWidthWithCurrentSize < wordBoundingBoxWidth) {
-                fontSize += FONT_SIZE_CHANGE_STEP;
-                textWidthWithCurrentSize = calculateTextWidth(text, fontSize);
-            }
-        }
-
-        return fontSize;
+        return wordBoundingBoxWidth.multiply(BigDecimal.valueOf(1000))
+                .divide(stringWidth, 2, RoundingMode.DOWN)
+                .floatValue();
     }
 
     private BigDecimal getScaledX(BigDecimal originalX, BigDecimal totalDocumentWidth) {
@@ -110,9 +96,5 @@ public class DocumentTransformer {
 
     private BigDecimal getScaledY(BigDecimal originalY, BigDecimal totalDocumentHeight) {
         return originalY.multiply(totalDocumentHeight);
-    }
-
-    private static float calculateTextWidth(String text, float fontSize) throws IOException {
-        return PDF_FONT.getStringWidth(text) / 1000 * fontSize;
     }
 }
